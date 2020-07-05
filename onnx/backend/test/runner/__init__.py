@@ -51,8 +51,11 @@ def retry_excute(times):  # type: (int) -> Callable[[Callable[..., Any]], Callab
 
 class Runner(object):
 
-    def __init__(self, backend, parent_module=None):  # type: (Type[Backend], Optional[str]) -> None
+    def __init__(self, backend, parent_module=None, device=None):  # type: (Type[Backend], Optional[str]) -> None
         self.backend = backend
+        self._devices = ("CPU", "CUDA")
+        if device is not None:
+            self._devices = (device,)
         self._parent_module = parent_module
         self._include_patterns = set()  # type: Set[Pattern[Text]]
         self._exclude_patterns = set()  # type: Set[Pattern[Text]]
@@ -64,19 +67,19 @@ class Runner(object):
         self._test_items = defaultdict(dict)  # type: Dict[Text, Dict[Text, TestItem]]
 
         for rt in load_model_tests(kind='node'):
-            self._add_model_test(rt, 'Node')
+            self._add_model_test(rt, 'Node', self._devices)
 
         for rt in load_model_tests(kind='real'):
-            self._add_model_test(rt, 'Real')
+            self._add_model_test(rt, 'Real', self._devices)
 
         for rt in load_model_tests(kind='simple'):
-            self._add_model_test(rt, 'Simple')
+            self._add_model_test(rt, 'Simple', self._devices)
 
         for ct in load_model_tests(kind='pytorch-converted'):
-            self._add_model_test(ct, 'PyTorchConverted')
+            self._add_model_test(ct, 'PyTorchConverted', self._devices)
 
         for ot in load_model_tests(kind='pytorch-operator'):
-            self._add_model_test(ot, 'PyTorchOperator')
+            self._add_model_test(ot, 'PyTorchOperator', self._devices)
 
     def _get_test_case(self, name):  # type: (Text) -> Type[unittest.TestCase]
         test_case = type(str(name), (unittest.TestCase,), {})
@@ -258,7 +261,7 @@ class Runner(object):
         for device in devices:
             add_device_test(device)
 
-    def _add_model_test(self, model_test, kind):  # type: (TestCase, Text) -> None
+    def _add_model_test(self, model_test, kind, devices=()):  # type: (TestCase, Text) -> None
         # model is loaded at runtime, note sometimes it could even
         # never loaded if the test skipped
         model_marker = [None]  # type: List[Optional[Union[ModelProto, NodeProto]]]
@@ -312,4 +315,4 @@ class Runner(object):
                                             rtol=model_test.rtol,
                                             atol=model_test.atol)
 
-        self._add_test(kind + 'Model', model_test.name, run, model_marker)
+        self._add_test(kind + 'Model', model_test.name, run, model_marker, devices)
